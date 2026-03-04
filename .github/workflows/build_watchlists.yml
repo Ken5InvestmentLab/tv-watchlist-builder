@@ -35,7 +35,7 @@ jobs:
         with:
           name: tradingview-watchlists
           path: |
-            tradingview_tse_top2000_by_1y_avg_volume_*.txt
-            tradingview_tse_top2000_by_1y_avg_volume.csv
+            tradingview_tse_price_le_1000_*.txt
+            tradingview_tse_price_le_1000.csv
           if-no-files-found: error
           retention-days: 30
