@@ -8,8 +8,8 @@ const yf = new YahooFinance();
 const hd = new Holidays('JP');
 
 const JPX_LIST_PAGE = 'https://www.jpx.co.jp/markets/statistics-equities/misc/01.html';
-const OUTPUT_BASENAME = 'tradingview_tse_top2000_by_1y_avg_volume';
-const TOP_N = 2000;
+const OUTPUT_BASENAME = 'tradingview_tse_price_le_1000';
+const PRICE_THRESHOLD = 1000;
 const MAX_SYMBOLS_PER_FILE = 1000;
 
 const INCLUDE_PRIME = true;
@@ -18,15 +18,11 @@ const INCLUDE_GROWTH = true;
 const INCLUDE_FOREIGN_STOCKS = true;
 
 const PREFIX = 'TSE';
-const INTERVAL = '1d';
 const BATCH_SIZE = 100;
 const SLEEP_MS = 1200;
 const MAX_ERROR_LOGS = 30;
 
-// 第3営業日のときだけ通知する
 const NOTIFY_ONLY_ON_THIRD_BUSINESS_DAY = true;
-
-// Ken5 メンション
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || '';
 const DISCORD_MENTION = '<@470776296931065866>';
 
@@ -35,7 +31,6 @@ const CODE_COL_CANDIDATES = ['コード', '銘柄コード'];
 const EXCLUDE_KEYWORDS = ['ETF', 'ETN', 'REIT', 'インフラファンド', '出資証券', '優先出資証券'];
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-function getDateOneYearAgo() { const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d; }
 function normalizeCode(value) { if (value === null || value === undefined) return ''; let s = String(value).trim(); if (s.endsWith('.0')) s = s.slice(0, -2); return s; }
 function pickColumn(columns, candidates) { for (const c of candidates) { if (columns.includes(c)) return c; } throw new Error(`必要な列が見つかりませんでした。候補: ${candidates.join(', ')} / 実際の列: ${columns.join(', ')}`); }
 function isPrimeMarket(marketValue) { return marketValue.includes('プライム'); }
@@ -44,7 +39,7 @@ function isGrowthMarket(marketValue) { return marketValue.includes('グロース
 function isForeignStock(marketValue) { return marketValue.includes('外国株式'); }
 function isTargetMarket(marketValue) { const prime = INCLUDE_PRIME && isPrimeMarket(marketValue); const standard = INCLUDE_STANDARD && isStandardMarket(marketValue); const growth = INCLUDE_GROWTH && isGrowthMarket(marketValue); return prime || standard || growth; }
 function csvEscape(value) { const s = String(value ?? ''); if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`; return s; }
-function writeCsv(file, rows) { const header = ['tv_symbol', 'yahoo_symbol', 'avg_volume_1y_daily']; const lines = [header.join(',')]; for (const row of rows) { lines.push([csvEscape(row.tv_symbol), csvEscape(row.yahoo_symbol), csvEscape(String(row.avg_volume_1y_daily))].join(',')); } fs.writeFileSync(path.resolve(file), '\uFEFF' + lines.join('\n'), 'utf8'); }
+function writeCsv(file, rows) { const header = ['tv_symbol', 'yahoo_symbol', 'current_price']; const lines = [header.join(',')]; for (const row of rows) { lines.push([csvEscape(row.tv_symbol), csvEscape(row.yahoo_symbol), csvEscape(String(row.current_price))].join(',')); } fs.writeFileSync(path.resolve(file), '\uFEFF' + lines.join('\n'), 'utf8'); }
 function writeTxt(file, symbols) { fs.writeFileSync(path.resolve(file), symbols.join(','), 'utf8'); }
 function chunkArray(array, size) { const chunks = []; for (let i = 0; i < array.length; i += size) chunks.push(array.slice(i, i + size)); return chunks; }
 function buildOutputFileName(index, totalFiles) { const seq = String(index + 1).padStart(3, '0'); if (totalFiles === 1) return `${OUTPUT_BASENAME}.txt`; return `${OUTPUT_BASENAME}_${seq}.txt`; }
@@ -61,25 +56,25 @@ async function sendDiscordUpdateReminder(todayYmd, fileCount, symbolCount) {
     return;
   }
 
+  const targetFiles = Array.from({ length: fileCount }, (_, i) => `\`${buildOutputFileName(i, fileCount)}\``).join('\n');
+
   const body = {
     content: `${DISCORD_MENTION} 銘柄リストの更新をお願いします。`,
     embeds: [
       {
         title: '📌 TradingView 銘柄リスト更新通知',
-        description: `東証銘柄リストの最新ファイルを作成しました。\nTradingView へのインポートをお願いします。`,
+        description: `株価が ${PRICE_THRESHOLD.toLocaleString('ja-JP')} 円以下の銘柄リストを作成しました。\nTradingView へのインポートをお願いします。`,
         color: 0xf39c12,
         fields: [
           { name: '日付', value: todayYmd, inline: true },
           { name: '抽出銘柄数', value: String(symbolCount), inline: true },
           { name: '分割ファイル数', value: String(fileCount), inline: true },
-          { name: '対象ファイル', value: `\`${OUTPUT_BASENAME}_001.txt\`\n\`${OUTPUT_BASENAME}_002.txt\``, inline: false }
+          { name: '対象ファイル', value: targetFiles || '-', inline: false }
         ],
         timestamp: new Date().toISOString()
       }
     ],
-    allowed_mentions: {
-      users: ['470776296931065866']
-    }
+    allowed_mentions: { users: ['470776296931065866'] }
   };
 
   const res = await fetch(DISCORD_WEBHOOK_URL, {
@@ -154,19 +149,22 @@ function extractTradingViewSymbolsFromWorkbook(workbook) {
   return symbols;
 }
 
-async function fetchAvgVolume1y(yahooSymbol) {
-  const result = await yf.chart(yahooSymbol, {
-    period1: getDateOneYearAgo(),
-    period2: new Date(),
-    interval: INTERVAL,
-  });
+async function fetchCurrentPrice(yahooSymbol) {
+  const result = await yf.quote(yahooSymbol);
+  if (!result) return null;
 
-  if (!result || !Array.isArray(result.quotes) || result.quotes.length === 0) return null;
+  const candidates = [
+    result.regularMarketPrice,
+    result.currentPrice,
+    result.previousClose
+  ];
 
-  const volumes = result.quotes.map(row => Number(row.volume)).filter(v => Number.isFinite(v));
-  if (volumes.length === 0) return null;
+  for (const value of candidates) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
 
-  return volumes.reduce((sum, v) => sum + v, 0) / volumes.length;
+  return null;
 }
 
 async function main() {
@@ -194,26 +192,25 @@ async function main() {
 
   for (let i = 0; i < mapped.length; i += BATCH_SIZE) {
     const chunk = mapped.slice(i, i + BATCH_SIZE);
-    console.log(`出来高取得中: ${i + 1} - ${i + chunk.length} / ${mapped.length}`);
+    console.log(`株価取得中: ${i + 1} - ${i + chunk.length} / ${mapped.length}`);
 
     for (const item of chunk) {
       try {
-        const avgVolume = await fetchAvgVolume1y(item.yahooSymbol);
-        rows.push({ tv_symbol: item.tvSymbol, yahoo_symbol: item.yahooSymbol, avg_volume_1y_daily: avgVolume });
+        const currentPrice = await fetchCurrentPrice(item.yahooSymbol);
+        rows.push({ tv_symbol: item.tvSymbol, yahoo_symbol: item.yahooSymbol, current_price: currentPrice });
       } catch (err) {
         if (errorCount < MAX_ERROR_LOGS) console.log(`取得失敗: ${item.yahooSymbol} / ${err.message}`);
         else if (errorCount === MAX_ERROR_LOGS) console.log('取得失敗ログが多いため、以降は省略します。');
         errorCount += 1;
-        rows.push({ tv_symbol: item.tvSymbol, yahoo_symbol: item.yahooSymbol, avg_volume_1y_daily: null });
+        rows.push({ tv_symbol: item.tvSymbol, yahoo_symbol: item.yahooSymbol, current_price: null });
       }
     }
 
     if (i + BATCH_SIZE < mapped.length) await sleep(SLEEP_MS);
   }
 
-  const validRows = rows.filter(row => row.avg_volume_1y_daily !== null).sort((a, b) => b.avg_volume_1y_daily - a.avg_volume_1y_daily);
-  const topRows = validRows.slice(0, TOP_N);
-  const chunks = chunkArray(topRows, MAX_SYMBOLS_PER_FILE);
+  const filteredRows = rows.filter(row => row.current_price !== null && row.current_price <= PRICE_THRESHOLD).sort((a, b) => a.current_price - b.current_price);
+  const chunks = chunkArray(filteredRows, MAX_SYMBOLS_PER_FILE);
 
   chunks.forEach((chunk, index) => {
     const fileName = buildOutputFileName(index, chunks.length);
@@ -221,18 +218,18 @@ async function main() {
     console.log(`出力TXT: ${fileName} (${chunk.length}銘柄)`);
   });
 
-  writeCsv(`${OUTPUT_BASENAME}.csv`, topRows);
+  writeCsv(`${OUTPUT_BASENAME}.csv`, filteredRows);
 
   console.log('---');
   console.log(`母集団銘柄数: ${tvSymbols.length}`);
-  console.log(`平均出来高を取得できた銘柄数: ${validRows.length}`);
-  console.log(`上位抽出件数: ${topRows.length}`);
+  console.log(`株価取得できた銘柄数: ${rows.filter(row => row.current_price !== null).length}`);
+  console.log(`${PRICE_THRESHOLD}円以下の抽出件数: ${filteredRows.length}`);
   console.log(`分割数: ${chunks.length}`);
   console.log(`失敗件数: ${errorCount}`);
   console.log(`CSV: ${OUTPUT_BASENAME}.csv`);
 
   if (!NOTIFY_ONLY_ON_THIRD_BUSINESS_DAY || isThirdBusinessDay) {
-    await sendDiscordUpdateReminder(todayYmd, chunks.length, topRows.length);
+    await sendDiscordUpdateReminder(todayYmd, chunks.length, filteredRows.length);
   } else {
     console.log('本日は第3営業日ではないため、Discord通知を送りません。');
   }
@@ -252,9 +249,7 @@ main().catch(async err => {
             timestamp: new Date().toISOString()
           }
         ],
-        allowed_mentions: {
-          users: ['470776296931065866']
-        }
+        allowed_mentions: { users: ['470776296931065866'] }
       };
 
       await fetch(DISCORD_WEBHOOK_URL, {
