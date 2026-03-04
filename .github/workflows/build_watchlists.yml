@@ -25,7 +25,7 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install xlsx yahoo-finance2
+        run: npm install xlsx yahoo-finance2 date-holidays
 
       - name: Build watchlists
         run: node build_watchlists_all_in_one.js
