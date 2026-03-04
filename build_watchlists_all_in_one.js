@@ -2,12 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
 const YahooFinance = require('yahoo-finance2').default;
-const Holidays = require('date-holidays');
 
 const yf = new YahooFinance();
-const hd = new Holidays('JP');
 
 const JPX_LIST_PAGE = 'https://www.jpx.co.jp/markets/statistics-equities/misc/01.html';
+const OUTPUT_DIR = 'output';
 const OUTPUT_BASENAME = 'tradingview_tse_price_le_1000';
 const PRICE_THRESHOLD = 1000;
 const MAX_SYMBOLS_PER_FILE = 1000;
@@ -22,10 +21,6 @@ const BATCH_SIZE = 100;
 const SLEEP_MS = 1200;
 const MAX_ERROR_LOGS = 30;
 
-const NOTIFY_ONLY_ON_THIRD_BUSINESS_DAY = true;
-const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || '';
-const DISCORD_MENTION = '<@470776296931065866>';
-
 const MARKET_COL_CANDIDATES = ['市場・商品区分', '市場商品区分', '市場区分'];
 const CODE_COL_CANDIDATES = ['コード', '銘柄コード'];
 const EXCLUDE_KEYWORDS = ['ETF', 'ETN', 'REIT', 'インフラファンド', '出資証券', '優先出資証券'];
@@ -33,6 +28,8 @@ const EXCLUDE_KEYWORDS = ['ETF', 'ETN', 'REIT', 'インフラファンド', '出
 let debugCount = 0;
 
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+function ensureOutputDir() { fs.mkdirSync(path.resolve(OUTPUT_DIR), { recursive: true }); }
+function outPath(fileName) { return path.resolve(OUTPUT_DIR, fileName); }
 function normalizeCode(value) { if (value === null || value === undefined) return ''; let s = String(value).trim(); if (s.endsWith('.0')) s = s.slice(0, -2); return s; }
 function pickColumn(columns, candidates) { for (const c of candidates) { if (columns.includes(c)) return c; } throw new Error(`必要な列が見つかりませんでした。候補: ${candidates.join(', ')} / 実際の列: ${columns.join(', ')}`); }
 function isPrimeMarket(marketValue) { return marketValue.includes('プライム'); }
@@ -41,55 +38,11 @@ function isGrowthMarket(marketValue) { return marketValue.includes('グロース
 function isForeignStock(marketValue) { return marketValue.includes('外国株式'); }
 function isTargetMarket(marketValue) { const prime = INCLUDE_PRIME && isPrimeMarket(marketValue); const standard = INCLUDE_STANDARD && isStandardMarket(marketValue); const growth = INCLUDE_GROWTH && isGrowthMarket(marketValue); return prime || standard || growth; }
 function csvEscape(value) { const s = String(value ?? ''); if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`; return s; }
-function writeCsv(file, rows) { const header = ['tv_symbol', 'yahoo_symbol', 'previous_close']; const lines = [header.join(',')]; for (const row of rows) { lines.push([csvEscape(row.tv_symbol), csvEscape(row.yahoo_symbol), csvEscape(String(row.previous_close))].join(',')); } fs.writeFileSync(path.resolve(file), '\uFEFF' + lines.join('\n'), 'utf8'); }
-function writeTxt(file, symbols) { fs.writeFileSync(path.resolve(file), symbols.join(','), 'utf8'); }
+function writeCsv(file, rows) { const header = ['tv_symbol', 'yahoo_symbol', 'previous_close']; const lines = [header.join(',')]; for (const row of rows) { lines.push([csvEscape(row.tv_symbol), csvEscape(row.yahoo_symbol), csvEscape(String(row.previous_close))].join(',')); } fs.writeFileSync(outPath(file), '\uFEFF' + lines.join('\n'), 'utf8'); }
+function writeTxt(file, symbols) { fs.writeFileSync(outPath(file), symbols.join(','), 'utf8'); }
 function chunkArray(array, size) { const chunks = []; for (let i = 0; i < array.length; i += size) chunks.push(array.slice(i, i + size)); return chunks; }
 function buildOutputFileName(index, totalFiles) { const seq = String(index + 1).padStart(3, '0'); if (totalFiles === 1) return `${OUTPUT_BASENAME}.txt`; return `${OUTPUT_BASENAME}_${seq}.txt`; }
 function tvToYahoo(tvSymbol) { const [, code] = tvSymbol.split(':'); return { tvSymbol, yahooSymbol: `${code}.T` }; }
-function toJstDate(now = new Date()) { return new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })); }
-function formatYmd(date) { const y = date.getFullYear(); const m = String(date.getMonth() + 1).padStart(2, '0'); const d = String(date.getDate()).padStart(2, '0'); return `${y}-${m}-${d}`; }
-function isBusinessDayJp(date) { const day = date.getDay(); if (day === 0 || day === 6) return false; return !hd.isHoliday(date); }
-function getBusinessDayNumberInMonthJst(date) { const y = date.getFullYear(); const m = date.getMonth(); let count = 0; for (let d = 1; d <= date.getDate(); d++) { const current = new Date(y, m, d); if (isBusinessDayJp(current)) count++; } return count; }
-function isThirdBusinessDayJst(date) { if (!isBusinessDayJp(date)) return false; return getBusinessDayNumberInMonthJst(date) === 3; }
-
-async function sendDiscordUpdateReminder(todayYmd, fileCount, symbolCount) {
-  if (!DISCORD_WEBHOOK_URL) {
-    console.log('DISCORD_WEBHOOK_URL が未設定のため、Discord通知をスキップします。');
-    return;
-  }
-
-  const targetFiles = Array.from({ length: fileCount }, (_, i) => `\`${buildOutputFileName(i, fileCount)}\``).join('\n');
-
-  const body = {
-    content: `${DISCORD_MENTION} 銘柄リストの更新をお願いします。`,
-    embeds: [
-      {
-        title: '📌 TradingView 銘柄リスト更新通知',
-        description: `前日終値が ${PRICE_THRESHOLD.toLocaleString('ja-JP')} 円以下の銘柄リストを作成しました。\nTradingView へのインポートをお願いします。`,
-        color: 0xf39c12,
-        fields: [
-          { name: '日付', value: todayYmd, inline: true },
-          { name: '抽出銘柄数', value: String(symbolCount), inline: true },
-          { name: '分割ファイル数', value: String(fileCount), inline: true },
-          { name: '対象ファイル', value: targetFiles || '-', inline: false }
-        ],
-        timestamp: new Date().toISOString()
-      }
-    ],
-    allowed_mentions: { users: ['470776296931065866'] }
-  };
-
-  const res = await fetch(DISCORD_WEBHOOK_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Discord通知失敗: ${res.status} ${text}`);
-  }
-}
 
 async function fetchText(url) { const res = await fetch(url); if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`); return await res.text(); }
 async function fetchBuffer(url) { const res = await fetch(url); if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`); const ab = await res.arrayBuffer(); return Buffer.from(ab); }
@@ -160,29 +113,16 @@ async function fetchPreviousClose(yahooSymbol) {
     debugCount += 1;
   }
 
-  const candidates = [
-    result.regularMarketPreviousClose,
-    result.previousClose
-  ];
-
+  const candidates = [result.regularMarketPreviousClose, result.previousClose];
   for (const value of candidates) {
     const n = Number(value);
     if (Number.isFinite(n)) return n;
   }
-
   return null;
 }
 
 async function main() {
-  const todayJst = toJstDate();
-  const todayYmd = formatYmd(todayJst);
-  const isThirdBusinessDay = isThirdBusinessDayJst(todayJst);
-  const businessDayNumber = isBusinessDayJp(todayJst) ? getBusinessDayNumberInMonthJst(todayJst) : null;
-
-  console.log(`JST today: ${todayYmd}`);
-  console.log(`Business day: ${isBusinessDayJp(todayJst)}`);
-  console.log(`Business day number in month: ${businessDayNumber ?? 'N/A'}`);
-  console.log(`Third business day: ${isThirdBusinessDay}`);
+  ensureOutputDir();
 
   console.log('JPXの上場銘柄一覧を取得中...');
   const workbook = await downloadJpxWorkbook();
@@ -221,7 +161,7 @@ async function main() {
   chunks.forEach((chunk, index) => {
     const fileName = buildOutputFileName(index, chunks.length);
     writeTxt(fileName, chunk.map(row => row.tv_symbol));
-    console.log(`出力TXT: ${fileName} (${chunk.length}銘柄)`);
+    console.log(`出力TXT: ${OUTPUT_DIR}/${fileName} (${chunk.length}銘柄)`);
   });
 
   writeCsv(`${OUTPUT_BASENAME}.csv`, filteredRows);
@@ -232,38 +172,10 @@ async function main() {
   console.log(`${PRICE_THRESHOLD}円以下の抽出件数: ${filteredRows.length}`);
   console.log(`分割数: ${chunks.length}`);
   console.log(`失敗件数: ${errorCount}`);
-  console.log(`CSV: ${OUTPUT_BASENAME}.csv`);
-
-  if (!NOTIFY_ONLY_ON_THIRD_BUSINESS_DAY || isThirdBusinessDay) {
-    await sendDiscordUpdateReminder(todayYmd, chunks.length, filteredRows.length);
-  } else {
-    console.log('本日は第3営業日ではないため、Discord通知を送りません。');
-  }
+  console.log(`CSV: ${OUTPUT_DIR}/${OUTPUT_BASENAME}.csv`);
 }
 
-main().catch(async err => {
+main().catch(err => {
   console.error(err);
-  if (DISCORD_WEBHOOK_URL) {
-    try {
-      const body = {
-        content: `${DISCORD_MENTION} 銘柄リスト更新処理でエラーが発生しました。`,
-        embeds: [
-          {
-            title: '❌ TradingView 銘柄リスト更新エラー',
-            description: String(err.message || err),
-            color: 0xe74c3c,
-            timestamp: new Date().toISOString()
-          }
-        ],
-        allowed_mentions: { users: ['470776296931065866'] }
-      };
-
-      await fetch(DISCORD_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-    } catch (_) {}
-  }
   process.exit(1);
 });
