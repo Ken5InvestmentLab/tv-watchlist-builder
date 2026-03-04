@@ -2,7 +2,7 @@ name: Build TradingView Watchlists
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # 毎日 UTC 00:00 = 日本時間 09:00
+    - cron: '0 1 * * *'   # 毎日 UTC 01:00 = 日本時間 10:00
   workflow_dispatch:
 
 jobs:
@@ -11,6 +11,9 @@ jobs:
 
     permissions:
       contents: read
+
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
 
     steps:
       - name: Checkout repository
