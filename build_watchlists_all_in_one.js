@@ -39,7 +39,7 @@ function isGrowthMarket(marketValue) { return marketValue.includes('グロース
 function isForeignStock(marketValue) { return marketValue.includes('外国株式'); }
 function isTargetMarket(marketValue) { const prime = INCLUDE_PRIME && isPrimeMarket(marketValue); const standard = INCLUDE_STANDARD && isStandardMarket(marketValue); const growth = INCLUDE_GROWTH && isGrowthMarket(marketValue); return prime || standard || growth; }
 function csvEscape(value) { const s = String(value ?? ''); if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`; return s; }
-function writeCsv(file, rows) { const header = ['tv_symbol', 'yahoo_symbol', 'current_price']; const lines = [header.join(',')]; for (const row of rows) { lines.push([csvEscape(row.tv_symbol), csvEscape(row.yahoo_symbol), csvEscape(String(row.current_price))].join(',')); } fs.writeFileSync(path.resolve(file), '\uFEFF' + lines.join('\n'), 'utf8'); }
+function writeCsv(file, rows) { const header = ['tv_symbol', 'yahoo_symbol', 'previous_close']; const lines = [header.join(',')]; for (const row of rows) { lines.push([csvEscape(row.tv_symbol), csvEscape(row.yahoo_symbol), csvEscape(String(row.previous_close))].join(',')); } fs.writeFileSync(path.resolve(file), '\uFEFF' + lines.join('\n'), 'utf8'); }
 function writeTxt(file, symbols) { fs.writeFileSync(path.resolve(file), symbols.join(','), 'utf8'); }
 function chunkArray(array, size) { const chunks = []; for (let i = 0; i < array.length; i += size) chunks.push(array.slice(i, i + size)); return chunks; }
 function buildOutputFileName(index, totalFiles) { const seq = String(index + 1).padStart(3, '0'); if (totalFiles === 1) return `${OUTPUT_BASENAME}.txt`; return `${OUTPUT_BASENAME}_${seq}.txt`; }
@@ -63,7 +63,7 @@ async function sendDiscordUpdateReminder(todayYmd, fileCount, symbolCount) {
     embeds: [
       {
         title: '📌 TradingView 銘柄リスト更新通知',
-        description: `株価が ${PRICE_THRESHOLD.toLocaleString('ja-JP')} 円以下の銘柄リストを作成しました。\nTradingView へのインポートをお願いします。`,
+        description: `前日終値が ${PRICE_THRESHOLD.toLocaleString('ja-JP')} 円以下の銘柄リストを作成しました。\nTradingView へのインポートをお願いします。`,
         color: 0xf39c12,
         fields: [
           { name: '日付', value: todayYmd, inline: true },
@@ -149,20 +149,12 @@ function extractTradingViewSymbolsFromWorkbook(workbook) {
   return symbols;
 }
 
-async function fetchCurrentPrice(yahooSymbol) {
+async function fetchPreviousClose(yahooSymbol) {
   const result = await yf.quote(yahooSymbol);
   if (!result) return null;
 
-  const candidates = [
-    result.regularMarketPrice,
-    result.currentPrice,
-    result.previousClose
-  ];
-
-  for (const value of candidates) {
-    const n = Number(value);
-    if (Number.isFinite(n)) return n;
-  }
+  const n = Number(result.previousClose);
+  if (Number.isFinite(n)) return n;
 
   return null;
 }
@@ -192,24 +184,24 @@ async function main() {
 
   for (let i = 0; i < mapped.length; i += BATCH_SIZE) {
     const chunk = mapped.slice(i, i + BATCH_SIZE);
-    console.log(`株価取得中: ${i + 1} - ${i + chunk.length} / ${mapped.length}`);
+    console.log(`前日終値取得中: ${i + 1} - ${i + chunk.length} / ${mapped.length}`);
 
     for (const item of chunk) {
       try {
-        const currentPrice = await fetchCurrentPrice(item.yahooSymbol);
-        rows.push({ tv_symbol: item.tvSymbol, yahoo_symbol: item.yahooSymbol, current_price: currentPrice });
+        const previousClose = await fetchPreviousClose(item.yahooSymbol);
+        rows.push({ tv_symbol: item.tvSymbol, yahoo_symbol: item.yahooSymbol, previous_close: previousClose });
       } catch (err) {
         if (errorCount < MAX_ERROR_LOGS) console.log(`取得失敗: ${item.yahooSymbol} / ${err.message}`);
         else if (errorCount === MAX_ERROR_LOGS) console.log('取得失敗ログが多いため、以降は省略します。');
         errorCount += 1;
-        rows.push({ tv_symbol: item.tvSymbol, yahoo_symbol: item.yahooSymbol, current_price: null });
+        rows.push({ tv_symbol: item.tvSymbol, yahoo_symbol: item.yahooSymbol, previous_close: null });
       }
     }
 
     if (i + BATCH_SIZE < mapped.length) await sleep(SLEEP_MS);
   }
 
-  const filteredRows = rows.filter(row => row.current_price !== null && row.current_price <= PRICE_THRESHOLD).sort((a, b) => a.current_price - b.current_price);
+  const filteredRows = rows.filter(row => row.previous_close !== null && row.previous_close <= PRICE_THRESHOLD).sort((a, b) => a.previous_close - b.previous_close);
   const chunks = chunkArray(filteredRows, MAX_SYMBOLS_PER_FILE);
 
   chunks.forEach((chunk, index) => {
@@ -222,7 +214,7 @@ async function main() {
 
   console.log('---');
   console.log(`母集団銘柄数: ${tvSymbols.length}`);
-  console.log(`株価取得できた銘柄数: ${rows.filter(row => row.current_price !== null).length}`);
+  console.log(`前日終値を取得できた銘柄数: ${rows.filter(row => row.previous_close !== null).length}`);
   console.log(`${PRICE_THRESHOLD}円以下の抽出件数: ${filteredRows.length}`);
   console.log(`分割数: ${chunks.length}`);
   console.log(`失敗件数: ${errorCount}`);
