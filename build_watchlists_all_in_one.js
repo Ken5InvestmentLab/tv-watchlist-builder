@@ -30,6 +30,8 @@ const MARKET_COL_CANDIDATES = ['市場・商品区分', '市場商品区分', '�
 const CODE_COL_CANDIDATES = ['コード', '銘柄コード'];
 const EXCLUDE_KEYWORDS = ['ETF', 'ETN', 'REIT', 'インフラファンド', '出資証券', '優先出資証券'];
 
+let debugCount = 0;
+
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function normalizeCode(value) { if (value === null || value === undefined) return ''; let s = String(value).trim(); if (s.endsWith('.0')) s = s.slice(0, -2); return s; }
 function pickColumn(columns, candidates) { for (const c of candidates) { if (columns.includes(c)) return c; } throw new Error(`必要な列が見つかりませんでした。候補: ${candidates.join(', ')} / 実際の列: ${columns.join(', ')}`); }
@@ -153,8 +155,20 @@ async function fetchPreviousClose(yahooSymbol) {
   const result = await yf.quote(yahooSymbol);
   if (!result) return null;
 
-  const n = Number(result.previousClose);
-  if (Number.isFinite(n)) return n;
+  if (debugCount < 10) {
+    console.log(`DEBUG ${yahooSymbol} regularMarketPreviousClose=${result.regularMarketPreviousClose} previousClose=${result.previousClose}`);
+    debugCount += 1;
+  }
+
+  const candidates = [
+    result.regularMarketPreviousClose,
+    result.previousClose
+  ];
+
+  for (const value of candidates) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
 
   return null;
 }
