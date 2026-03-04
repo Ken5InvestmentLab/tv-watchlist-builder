@@ -10,14 +10,13 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
-
-    env:
-      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -25,17 +24,19 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install xlsx yahoo-finance2 date-holidays
+        run: npm install xlsx yahoo-finance2
 
       - name: Build watchlists
         run: node build_watchlists_all_in_one.js
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: tradingview-watchlists
-          path: |
-            tradingview_tse_price_le_1000_*.txt
-            tradingview_tse_price_le_1000.csv
-          if-no-files-found: error
-          retention-days: 30
+      - name: Commit output files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add output/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update TradingView watchlists"
+            git push
+          fi
