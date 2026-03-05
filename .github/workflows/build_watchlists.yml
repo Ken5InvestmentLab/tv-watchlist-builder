@@ -40,3 +40,19 @@ jobs:
             git commit -m "Update TradingView watchlists"
             git push
           fi
+
+      - name: Notify Discord on Failure
+        if: failure()
+        run: |
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d '{
+                 "username": "Watchlist Builder Bot",
+                 "content": "⚠️ **Watchlist Build Failed!**",
+                 "embeds": [{
+                   "title": "Build Error Log",
+                   "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                   "description": "JPXからのデータ取得、または銘柄リストの作成中にエラーが発生しました。スクリプトが最新のExcelを見つけられていない可能性があります。",
+                   "color": 16711680
+                 }]
+               }' ${{ secrets.DISCORD_WEBHOOK_URL }}
