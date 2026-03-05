@@ -47,12 +47,12 @@ jobs:
           curl -H "Content-Type: application/json" \
                -X POST \
                -d '{
-                 "username": "Watchlist Builder Bot",
-                 "content": "⚠️ **Watchlist Build Failed!**",
+                 "username": "TradingView Alert",
+                 "content": "🔴 **[System] Watchlist Build Error**",
                  "embeds": [{
                    "title": "Build Error Log",
                    "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                   "description": "JPXからのデータ取得、または銘柄リストの作成中にエラーが発生しました。スクリプトが最新のExcelを見つけられていない可能性があります。",
+                   "description": "銘柄リストの自動生成中にエラーが発生しました。JPXの仕様変更やAPI制限の可能性があります。",
                    "color": 16711680
                  }]
                }' ${{ secrets.DISCORD_WEBHOOK_URL }}
