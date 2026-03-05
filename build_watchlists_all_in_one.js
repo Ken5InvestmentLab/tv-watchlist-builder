@@ -7,8 +7,8 @@ const yf = new YahooFinance();
 
 const JPX_LIST_PAGE = 'https://www.jpx.co.jp/markets/statistics-equities/misc/01.html';
 const OUTPUT_DIR = 'output';
-const OUTPUT_BASENAME = 'tradingview_tse_price_le_1000';
-const PRICE_THRESHOLD = 1000;
+const OUTPUT_BASENAME = 'tradingview_tse_price_le_1500';
+const PRICE_THRESHOLD = 1500;
 const MAX_SYMBOLS_PER_FILE = 1000;
 
 const INCLUDE_PRIME = true;
