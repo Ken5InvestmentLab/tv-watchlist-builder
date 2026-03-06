@@ -1,8 +1,6 @@
 name: Build TradingView Watchlists
 
 on:
-  schedule:
-    - cron: '16 00 * * *' # 毎日 日本時間 09:16
   workflow_dispatch:
 
 jobs:
