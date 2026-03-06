@@ -2,7 +2,7 @@ name: Build TradingView Watchlists
 
 on:
   schedule:
-    - cron: '16 00 * * *'   # 毎日 日本時間 09:16
+    - cron: '16 1 * * *'   # 毎日 日本時間 10:16
   workflow_dispatch:
 
 jobs:
@@ -61,7 +61,7 @@ jobs:
           curl -X POST \
             -H "Accept: application/vnd.github.v3+json" \
             -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" \
-            https://api.github.com/repos/【あなたのユーザー名】/【2つ目のリポジトリ名】/dispatches \
+            https://api.github.com/repos/Ken5InvestmentLab/tv-watchlist-updater/dispatches \
             -d '{"event_type": "build_complete"}'
 
       - name: Notify Discord on Failure
