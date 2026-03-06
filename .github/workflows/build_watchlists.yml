@@ -52,7 +52,7 @@ jobs:
                  "content": "🟢 **[System] Watchlist Build Success**",
                  "embeds": [{
                    "title": "Build Completed",
-                   "description": "最新の銘柄リストが正常に生成されました。トレビューの更新を開始します。",
+                   "description": "最新の銘柄リストが正常に生成されました。TradingViewの更新を開始します。",
                    "color": 65280
                  }]
                }' ${{ secrets.DISCORD_WEBHOOK_URL }}
