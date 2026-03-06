@@ -6,7 +6,7 @@ on:
 concurrency:
   group: build-tradingview-watchlists
   cancel-in-progress: true
-  
+
 jobs:
   build-watchlists:
     runs-on: ubuntu-latest
@@ -45,17 +45,27 @@ jobs:
       - name: Notify Discord on Success
         if: success()
         run: |
+          payload='{
+            "username": "TradingView Alert",
+            "content": "🟢 **[System] Watchlist Build Success**",
+            "embeds": [{
+              "title": "Build Completed",
+              "description": "最新の銘柄リストが正常に生成されました。TradingViewの更新を開始します。",
+              "color": 65280
+            }]
+          }'
+
+          [ -n "${{ secrets.DISCORD_WEBHOOK_URL_1 }}" ] && \
           curl -H "Content-Type: application/json" \
                -X POST \
-               -d '{
-                 "username": "TradingView Alert",
-                 "content": "🟢 **[System] Watchlist Build Success**",
-                 "embeds": [{
-                   "title": "Build Completed",
-                   "description": "最新の銘柄リストが正常に生成されました。TradingViewの更新を開始します。",
-                   "color": 65280
-                 }]
-               }' ${{ secrets.DISCORD_WEBHOOK_URL }}
+               -d "$payload" \
+               "${{ secrets.DISCORD_WEBHOOK_URL_1 }}"
+
+          [ -n "${{ secrets.DISCORD_WEBHOOK_URL_2 }}" ] && \
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "$payload" \
+               "${{ secrets.DISCORD_WEBHOOK_URL_2 }}"
 
       - name: Trigger TradingView Update (API)
         if: success()
@@ -69,15 +79,25 @@ jobs:
       - name: Notify Discord on Failure
         if: failure()
         run: |
+          payload='{
+            "username": "TradingView Alert",
+            "content": "🔴 **[System] Watchlist Build Error**",
+            "embeds": [{
+              "title": "Build Error Log",
+              "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "description": "銘柄リストの自動生成中にエラーが発生しました。",
+              "color": 16711680
+            }]
+          }'
+
+          [ -n "${{ secrets.DISCORD_WEBHOOK_URL_1 }}" ] && \
           curl -H "Content-Type: application/json" \
                -X POST \
-               -d '{
-                 "username": "TradingView Alert",
-                 "content": "🔴 **[System] Watchlist Build Error**",
-                 "embeds": [{
-                   "title": "Build Error Log",
-                   "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-                   "description": "銘柄リストの自動生成中にエラーが発生しました。",
-                   "color": 16711680
-                 }]
-               }' ${{ secrets.DISCORD_WEBHOOK_URL }}
+               -d "$payload" \
+               "${{ secrets.DISCORD_WEBHOOK_URL_1 }}"
+
+          [ -n "${{ secrets.DISCORD_WEBHOOK_URL_2 }}" ] && \
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "$payload" \
+               "${{ secrets.DISCORD_WEBHOOK_URL_2 }}"
