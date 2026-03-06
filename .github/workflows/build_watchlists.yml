@@ -71,7 +71,7 @@ jobs:
             local name="$2"
 
             if [ -z "$url" ]; then
-              echo "$name is empty. Skip."
+              echo "::warning::$name is empty. Skip."
               return 0
             fi
 
@@ -81,19 +81,20 @@ jobs:
               -X POST \
               -d "$payload" \
               "$url"; then
-              echo "Failed: $name"
+              echo "::warning::Failed to send Discord notification: $name"
               notify_failed=1
             else
               echo "Success: $name"
             fi
+
+            return 0
           }
 
           send_webhook "${{ secrets.DISCORD_WEBHOOK_URL_1 }}" "DISCORD_WEBHOOK_URL_1"
           send_webhook "${{ secrets.DISCORD_WEBHOOK_URL_2 }}" "DISCORD_WEBHOOK_URL_2"
 
           if [ "$notify_failed" -ne 0 ]; then
-            echo "One or more Discord notifications failed."
-            exit 1
+            echo "::warning::One or more Discord notifications failed, but workflow will continue."
           fi
 
       - name: Notify Discord on Failure
@@ -117,7 +118,7 @@ jobs:
             local name="$2"
 
             if [ -z "$url" ]; then
-              echo "$name is empty. Skip."
+              echo "::warning::$name is empty. Skip."
               return 0
             fi
 
@@ -127,17 +128,18 @@ jobs:
               -X POST \
               -d "$payload" \
               "$url"; then
-              echo "Failed: $name"
+              echo "::warning::Failed to send Discord failure notification: $name"
               notify_failed=1
             else
               echo "Success: $name"
             fi
+
+            return 0
           }
 
           send_webhook "${{ secrets.DISCORD_WEBHOOK_URL_1 }}" "DISCORD_WEBHOOK_URL_1"
           send_webhook "${{ secrets.DISCORD_WEBHOOK_URL_2 }}" "DISCORD_WEBHOOK_URL_2"
 
           if [ "$notify_failed" -ne 0 ]; then
-            echo "One or more Discord notifications failed."
-            exit 1
+            echo "::warning::One or more Discord failure notifications failed."
           fi
