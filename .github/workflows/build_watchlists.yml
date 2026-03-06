@@ -78,4 +78,4 @@ jobs:
                    "description": "銘柄リストの自動生成中にエラーが発生しました。",
                    "color": 16711680
                  }]
-               }' ${{ secrets.DISCORD_WEBHOOK }}
+               }' ${{ secrets.DISCORD_WEBHOOK_URL }}
