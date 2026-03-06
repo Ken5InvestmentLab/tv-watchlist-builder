@@ -22,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install dependencies
         run: npm install xlsx yahoo-finance2
@@ -55,22 +55,42 @@ jobs:
             }]
           }'
 
-          [ -n "${{ secrets.DISCORD_WEBHOOK_URL_1 }}" ] && \
-          curl -H "Content-Type: application/json" \
-               -X POST \
-               -d "$payload" \
-               "${{ secrets.DISCORD_WEBHOOK_URL_1 }}"
+          notify_failed=0
 
-          [ -n "${{ secrets.DISCORD_WEBHOOK_URL_2 }}" ] && \
-          curl -H "Content-Type: application/json" \
-               -X POST \
-               -d "$payload" \
-               "${{ secrets.DISCORD_WEBHOOK_URL_2 }}"
+          send_webhook() {
+            local url="$1"
+            local name="$2"
+
+            if [ -z "$url" ]; then
+              echo "$name is empty. Skip."
+              return 0
+            fi
+
+            echo "Sending to $name ..."
+            if ! curl --fail --silent --show-error \
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d "$payload" \
+              "$url"; then
+              echo "Failed: $name"
+              notify_failed=1
+            else
+              echo "Success: $name"
+            fi
+          }
+
+          send_webhook "${{ secrets.DISCORD_WEBHOOK_URL_1 }}" "DISCORD_WEBHOOK_URL_1"
+          send_webhook "${{ secrets.DISCORD_WEBHOOK_URL_2 }}" "DISCORD_WEBHOOK_URL_2"
+
+          if [ "$notify_failed" -ne 0 ]; then
+            echo "One or more Discord notifications failed."
+            exit 1
+          fi
 
       - name: Trigger TradingView Update (API)
         if: success()
         run: |
-          curl -X POST \
+          curl --fail --silent --show-error -X POST \
             -H "Accept: application/vnd.github.v3+json" \
             -H "Authorization: token ${{ secrets.MY_GITHUB_TOKEN }}" \
             https://api.github.com/repos/Ken5InvestmentLab/tv-watchlist-updater/dispatches \
@@ -90,14 +110,34 @@ jobs:
             }]
           }'
 
-          [ -n "${{ secrets.DISCORD_WEBHOOK_URL_1 }}" ] && \
-          curl -H "Content-Type: application/json" \
-               -X POST \
-               -d "$payload" \
-               "${{ secrets.DISCORD_WEBHOOK_URL_1 }}"
+          notify_failed=0
 
-          [ -n "${{ secrets.DISCORD_WEBHOOK_URL_2 }}" ] && \
-          curl -H "Content-Type: application/json" \
-               -X POST \
-               -d "$payload" \
-               "${{ secrets.DISCORD_WEBHOOK_URL_2 }}"
+          send_webhook() {
+            local url="$1"
+            local name="$2"
+
+            if [ -z "$url" ]; then
+              echo "$name is empty. Skip."
+              return 0
+            fi
+
+            echo "Sending to $name ..."
+            if ! curl --fail --silent --show-error \
+              -H "Content-Type: application/json" \
+              -X POST \
+              -d "$payload" \
+              "$url"; then
+              echo "Failed: $name"
+              notify_failed=1
+            else
+              echo "Success: $name"
+            fi
+          }
+
+          send_webhook "${{ secrets.DISCORD_WEBHOOK_URL_1 }}" "DISCORD_WEBHOOK_URL_1"
+          send_webhook "${{ secrets.DISCORD_WEBHOOK_URL_2 }}" "DISCORD_WEBHOOK_URL_2"
+
+          if [ "$notify_failed" -ne 0 ]; then
+            echo "One or more Discord notifications failed."
+            exit 1
+          fi
