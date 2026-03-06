@@ -53,7 +53,7 @@ jobs:
                    "description": "最新の銘柄リストが正常に生成されました。トレビューの更新を開始します。",
                    "color": 65280
                  }]
-               }' ${{ secrets.DISCORD_WEBHOOK }}
+               }' ${{ secrets.DISCORD_WEBHOOK_URL }}
 
       - name: Trigger TradingView Update (API)
         if: success()
