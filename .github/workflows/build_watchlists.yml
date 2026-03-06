@@ -2,7 +2,7 @@ name: Build TradingView Watchlists
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '16 00 * * *'
   workflow_dispatch:
 
 jobs:
