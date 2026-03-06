@@ -48,6 +48,19 @@ async function fetchText(url) { const res = await fetch(url); if (!res.ok) throw
 async function fetchBuffer(url) { const res = await fetch(url); if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`); const ab = await res.arrayBuffer(); return Buffer.from(ab); }
 function resolveUrl(base, relative) { return new URL(relative, base).toString(); }
 
+function clearOldOutputFiles() {
+  ensureOutputDir();
+  const dir = path.resolve(OUTPUT_DIR);
+  for (const file of fs.readdirSync(dir)) {
+    if (
+      file.startsWith(OUTPUT_BASENAME) &&
+      (file.endsWith('.txt') || file.endsWith('.csv'))
+    ) {
+      fs.unlinkSync(path.join(dir, file));
+    }
+  }
+}
+
 function findJpxExcelUrl(html) {
   const hrefs = [...html.matchAll(/href="([^"]+\.(?:xls|xlsx))"/gi)].map(m => m[1]);
   const scored = hrefs.map(href => {
@@ -123,6 +136,7 @@ async function fetchPreviousClose(yahooSymbol) {
 
 async function main() {
   ensureOutputDir();
+  clearOldOutputFiles();
 
   console.log('JPXの上場銘柄一覧を取得中...');
   const workbook = await downloadJpxWorkbook();
