@@ -3,6 +3,10 @@ name: Build TradingView Watchlists
 on:
   workflow_dispatch:
 
+concurrency:
+  group: build-tradingview-watchlists
+  cancel-in-progress: true
+  
 jobs:
   build-watchlists:
     runs-on: ubuntu-latest
