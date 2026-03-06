@@ -10,8 +10,6 @@ const OUTPUT_DIR = 'output';
 const OUTPUT_BASENAME = 'tradingview_tse_price_le_1000';
 const PRICE_THRESHOLD = 1000;
 const MAX_SYMBOLS_PER_FILE = 1000;
-
-// 追加
 const MAX_WATCHLIST_FILES = 2;
 const MAX_TOTAL_SYMBOLS = MAX_SYMBOLS_PER_FILE * MAX_WATCHLIST_FILES;
 
@@ -34,36 +32,14 @@ let debugCount = 0;
 function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 function ensureOutputDir() { fs.mkdirSync(path.resolve(OUTPUT_DIR), { recursive: true }); }
 function outPath(fileName) { return path.resolve(OUTPUT_DIR, fileName); }
-function normalizeCode(value) {
-  if (value === null || value === undefined) return '';
-  let s = String(value).trim();
-  if (s.endsWith('.0')) s = s.slice(0, -2);
-  return s;
-}
-function pickColumn(columns, candidates) {
-  for (const c of candidates) {
-    if (columns.includes(c)) return c;
-  }
-  throw new Error(`必要な列が見つかりませんでした。候補: ${candidates.join(', ')} / 実際の列: ${columns.join(', ')}`);
-}
+function normalizeCode(value) { if (value === null || value === undefined) return ''; let s = String(value).trim(); if (s.endsWith('.0')) s = s.slice(0, -2); return s; }
+function pickColumn(columns, candidates) { for (const c of candidates) { if (columns.includes(c)) return c; } throw new Error(`必要な列が見つかりませんでした。候補: ${candidates.join(', ')} / 実際の列: ${columns.join(', ')}`); }
 function isPrimeMarket(marketValue) { return marketValue.includes('プライム'); }
 function isStandardMarket(marketValue) { return marketValue.includes('スタンダード'); }
 function isGrowthMarket(marketValue) { return marketValue.includes('グロース'); }
 function isForeignStock(marketValue) { return marketValue.includes('外国株式'); }
-function isTargetMarket(marketValue) {
-  const prime = INCLUDE_PRIME && isPrimeMarket(marketValue);
-  const standard = INCLUDE_STANDARD && isStandardMarket(marketValue);
-  const growth = INCLUDE_GROWTH && isGrowthMarket(marketValue);
-  return prime || standard || growth;
-}
-
-function csvEscape(value) {
-  const s = String(value ?? '');
-  if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
-// volume列を追加
+function isTargetMarket(marketValue) { const prime = INCLUDE_PRIME && isPrimeMarket(marketValue); const standard = INCLUDE_STANDARD && isStandardMarket(marketValue); const growth = INCLUDE_GROWTH && isGrowthMarket(marketValue); return prime || standard || growth; }
+function csvEscape(value) { const s = String(value ?? ''); if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`; return s; }
 function writeCsv(file, rows) {
   const header = ['tv_symbol', 'yahoo_symbol', 'previous_close', 'volume'];
   const lines = [header.join(',')];
@@ -72,57 +48,28 @@ function writeCsv(file, rows) {
       csvEscape(row.tv_symbol),
       csvEscape(row.yahoo_symbol),
       csvEscape(String(row.previous_close)),
-      csvEscape(String(row.volume ?? ''))
+      csvEscape(String(row.volume ?? '')),
     ].join(','));
   }
   fs.writeFileSync(outPath(file), '\uFEFF' + lines.join('\n'), 'utf8');
 }
+function writeTxt(file, symbols) { fs.writeFileSync(outPath(file), symbols.join(','), 'utf8'); }
+function chunkArray(array, size) { const chunks = []; for (let i = 0; i < array.length; i += size) chunks.push(array.slice(i, i + size)); return chunks; }
+function buildOutputFileName(index) { const seq = String(index + 1).padStart(3, '0'); return `${OUTPUT_BASENAME}_${seq}.txt`; }
+function tvToYahoo(tvSymbol) { const [, code] = tvSymbol.split(':'); return { tvSymbol, yahooSymbol: `${code}.T` }; }
 
-function writeTxt(file, symbols) {
-  fs.writeFileSync(outPath(file), symbols.join(','), 'utf8');
-}
-
-function chunkArray(array, size) {
-  const chunks = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-  return chunks;
-}
-
-// 常に _001 / _002 形式に固定
-function buildOutputFileName(index) {
-  const seq = String(index + 1).padStart(3, '0');
-  return `${OUTPUT_BASENAME}_${seq}.txt`;
-}
-
-function tvToYahoo(tvSymbol) {
-  const [, code] = tvSymbol.split(':');
-  return { tvSymbol, yahooSymbol: `${code}.T` };
-}
-
-async function fetchText(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
-  return await res.text();
-}
-
-async function fetchBuffer(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
-  const ab = await res.arrayBuffer();
-  return Buffer.from(ab);
-}
-
-function resolveUrl(base, relative) {
-  return new URL(relative, base).toString();
-}
+async function fetchText(url) { const res = await fetch(url); if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`); return await res.text(); }
+async function fetchBuffer(url) { const res = await fetch(url); if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`); const ab = await res.arrayBuffer(); return Buffer.from(ab); }
+function resolveUrl(base, relative) { return new URL(relative, base).toString(); }
 
 function clearOldOutputFiles() {
   ensureOutputDir();
   const dir = path.resolve(OUTPUT_DIR);
   for (const file of fs.readdirSync(dir)) {
-    if (file.startsWith(OUTPUT_BASENAME) && (file.endsWith('.txt') || file.endsWith('.csv'))) {
+    if (
+      file.startsWith(OUTPUT_BASENAME) &&
+      (file.endsWith('.txt') || file.endsWith('.csv'))
+    ) {
       fs.unlinkSync(path.join(dir, file));
     }
   }
@@ -138,7 +85,6 @@ function findJpxExcelUrl(html) {
     if (s.includes('misc')) score += 5;
     return { href, score };
   }).sort((a, b) => b.score - a.score);
-
   if (scored.length === 0) throw new Error('JPXページからExcelリンクを見つけられませんでした。');
   return resolveUrl(JPX_LIST_PAGE, scored[0].href);
 }
@@ -155,7 +101,6 @@ function extractTradingViewSymbolsFromWorkbook(workbook) {
   const firstSheetName = workbook.SheetNames[0];
   const worksheet = workbook.Sheets[firstSheetName];
   const rows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-
   if (!rows.length) throw new Error('JPXのExcelにデータがありません。');
 
   const columns = Object.keys(rows[0]).map(c => String(c).trim());
@@ -179,7 +124,6 @@ function extractTradingViewSymbolsFromWorkbook(workbook) {
 
     const tvSymbol = `${PREFIX}:${code}`;
     if (seen.has(tvSymbol)) continue;
-
     seen.add(tvSymbol);
     symbols.push(tvSymbol);
   }
@@ -195,27 +139,24 @@ function firstFiniteNumber(...values) {
   return null;
 }
 
-// previous_close と volume をまとめて取得
 async function fetchQuoteMetrics(yahooSymbol) {
   const result = await yf.quote(yahooSymbol);
   if (!result) return { previousClose: null, volume: null };
 
   if (debugCount < 10) {
-    console.log(
-      `DEBUG ${yahooSymbol} regularMarketPreviousClose=${result.regularMarketPreviousClose} previousClose=${result.previousClose} regularMarketVolume=${result.regularMarketVolume}`
-    );
+    console.log(`DEBUG ${yahooSymbol} regularMarketPreviousClose=${result.regularMarketPreviousClose} previousClose=${result.previousClose} regularMarketVolume=${result.regularMarketVolume} averageDailyVolume10Day=${result.averageDailyVolume10Day} averageDailyVolume3Month=${result.averageDailyVolume3Month}`);
     debugCount += 1;
   }
 
   const previousClose = firstFiniteNumber(
     result.regularMarketPreviousClose,
-    result.previousClose
+    result.previousClose,
   );
 
   const volume = firstFiniteNumber(
     result.regularMarketVolume,
     result.averageDailyVolume10Day,
-    result.averageDailyVolume3Month
+    result.averageDailyVolume3Month,
   );
 
   return { previousClose, volume };
@@ -225,10 +166,10 @@ async function main() {
   ensureOutputDir();
   clearOldOutputFiles();
 
-  console.log('JPXの上場銘柄一覧を取得中。');
+  console.log('JPXの上場銘柄一覧を取得中...');
   const workbook = await downloadJpxWorkbook();
 
-  console.log('TradingView用銘柄リストを抽出中。');
+  console.log('TradingView用銘柄リストを抽出中...');
   const tvSymbols = extractTradingViewSymbolsFromWorkbook(workbook);
   const mapped = tvSymbols.map(tvToYahoo);
 
@@ -239,7 +180,7 @@ async function main() {
 
   for (let i = 0; i < mapped.length; i += BATCH_SIZE) {
     const chunk = mapped.slice(i, i + BATCH_SIZE);
-    console.log(`前日終値/出来高 取得中: ${i + 1} - ${i + chunk.length} / ${mapped.length}`);
+    console.log(`前日終値/出来高取得中: ${i + 1} - ${i + chunk.length} / ${mapped.length}`);
 
     for (const item of chunk) {
       try {
@@ -248,18 +189,17 @@ async function main() {
           tv_symbol: item.tvSymbol,
           yahoo_symbol: item.yahooSymbol,
           previous_close: metrics.previousClose,
-          volume: metrics.volume
+          volume: metrics.volume,
         });
       } catch (err) {
         if (errorCount < MAX_ERROR_LOGS) console.log(`取得失敗: ${item.yahooSymbol} / ${err.message}`);
         else if (errorCount === MAX_ERROR_LOGS) console.log('取得失敗ログが多いため、以降は省略します。');
         errorCount += 1;
-
         rows.push({
           tv_symbol: item.tvSymbol,
           yahoo_symbol: item.yahooSymbol,
           previous_close: null,
-          volume: null
+          volume: null,
         });
       }
     }
@@ -267,27 +207,22 @@ async function main() {
     if (i + BATCH_SIZE < mapped.length) await sleep(SLEEP_MS);
   }
 
-  // まず価格条件で抽出
-  const filteredRows = rows
-    .filter(row => row.previous_close !== null && row.previous_close <= PRICE_THRESHOLD);
+  const filteredRows = rows.filter(row => row.previous_close !== null && row.previous_close <= PRICE_THRESHOLD);
 
-  // 2000件超なら出来高上位2000件に絞る
-  let outputRows = filteredRows;
+  let outputRows = [...filteredRows];
   let cappedByVolume = false;
 
-  if (filteredRows.length > MAX_TOTAL_SYMBOLS) {
-    outputRows = [...filteredRows]
-      .sort((a, b) => {
-        const volA = Number.isFinite(a.volume) ? a.volume : -1;
-        const volB = Number.isFinite(b.volume) ? b.volume : -1;
-        if (volB !== volA) return volB - volA;
-        return a.previous_close - b.previous_close;
-      })
-      .slice(0, MAX_TOTAL_SYMBOLS);
+  if (outputRows.length > MAX_TOTAL_SYMBOLS) {
+    outputRows.sort((a, b) => {
+      const volA = Number.isFinite(a.volume) ? a.volume : -1;
+      const volB = Number.isFinite(b.volume) ? b.volume : -1;
+      if (volB !== volA) return volB - volA;
+      return a.previous_close - b.previous_close;
+    });
+    outputRows = outputRows.slice(0, MAX_TOTAL_SYMBOLS);
     cappedByVolume = true;
   } else {
-    // 2000件以下なら従来どおり価格順で並べる
-    outputRows = [...filteredRows].sort((a, b) => a.previous_close - b.previous_close);
+    outputRows.sort((a, b) => a.previous_close - b.previous_close);
   }
 
   const chunks = chunkArray(outputRows, MAX_SYMBOLS_PER_FILE).slice(0, MAX_WATCHLIST_FILES);
