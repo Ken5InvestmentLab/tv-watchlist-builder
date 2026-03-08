@@ -55,7 +55,7 @@ jobs:
         if: success()
         run: |
           payload='{
-            "username": "TradingView Alert",
+            "username": "System Log",
             "content": "🟢 **[System] Watchlist Build Success**",
             "embeds": [{
               "title": "Build Completed",
@@ -101,7 +101,7 @@ jobs:
         if: failure()
         run: |
           payload='{
-            "username": "TradingView Alert",
+            "username": "System Log",
             "content": "🔴 **[System] Watchlist Build Error**",
             "embeds": [{
               "title": "Build Error Log",
