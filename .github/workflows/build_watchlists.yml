@@ -22,13 +22,28 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm install xlsx yahoo-finance2
 
       - name: Build watchlists
         run: node build_watchlists_all_in_one.js
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-watchlists-artifacts
+          path: |
+            output/**/*.txt
+            output/**/*.csv
+            output/**/*summary.json
+            output/**/*failures.json
+            logs/**/*.log
+            .cache/**/*.json
+          if-no-files-found: ignore
 
       - name: Commit output files
         run: |
@@ -106,7 +121,7 @@ jobs:
             "embeds": [{
               "title": "Build Error Log",
               "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-              "description": "銘柄リストの自動生成中にエラーが発生しました。",
+              "description": "銘柄リストの自動生成中にエラーが発生しました。artifact の summary / failures / log を確認してください。",
               "color": 16711680
             }]
           }'
