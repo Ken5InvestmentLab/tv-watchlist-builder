@@ -38,7 +38,7 @@ const MAX_429_RETRIES_PER_BATCH = 3;
 const RETRY_BASE_WAIT_MS = 20000;
 
 // failure化しきい値
-const MIN_SUCCESS_RATE = 0.95;     // 97%未満で失敗
+const MIN_SUCCESS_RATE = 0.95;     // 95%未満で失敗
 const MAX_ERROR_COUNT = 200;       // 失敗件数が多すぎたら失敗
 const MAX_429_COUNT = 100;          // 429が多すぎたら失敗
 
