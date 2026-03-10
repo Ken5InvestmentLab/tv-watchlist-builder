@@ -1,0 +1,19 @@
+{
+  "runId": "20260310_092425",
+  "universeCount": 3773,
+  "fetchedCount": 3773,
+  "filteredCount": 1307,
+  "outputRows": 1307,
+  "splitCount": 2,
+  "cappedByVolume": false,
+  "errorCount": 0,
+  "rateLimitCount": 0,
+  "successRate": 1,
+  "cacheHitCount": 0,
+  "yahooFetchTargetCount": 3773,
+  "thresholds": {
+    "MIN_SUCCESS_RATE": 0.95,
+    "MAX_ERROR_COUNT": 200,
+    "MAX_429_COUNT": 100
+  }
+}
