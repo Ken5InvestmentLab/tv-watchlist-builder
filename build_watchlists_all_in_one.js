@@ -290,6 +290,10 @@ function extractTradingViewSymbolsFromWorkbook(workbook) {
 
 function firstFiniteNumber(...values) {
   for (const value of values) {
+    if (value === null || value === undefined || value === "") {
+      continue;
+    }
+
     const n = Number(value);
     if (Number.isFinite(n)) return n;
   }
