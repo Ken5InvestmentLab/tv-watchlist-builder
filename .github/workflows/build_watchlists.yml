@@ -28,7 +28,18 @@ jobs:
         run: npm install xlsx yahoo-finance2
 
       - name: Build watchlists
-        run: node build_watchlists_all_in_one.js
+        id: build
+        run: |
+          node build_watchlists_all_in_one.js
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Collect Node.js environment info on failure
+        if: failure()
+        run: |
+          echo "=== Node.js version ===" && node --version
+          echo "=== npm version ===" && npm --version
+          echo "=== Installed packages ===" && npm list --depth=0 2>/dev/null || true
+          echo "=== Environment ===" && env | grep -v SECRET | grep -v TOKEN | grep -v KEY | sort
 
       - name: Upload build artifacts
         if: always()
