@@ -6,102 +6,55 @@ on:
     types: [completed]
 
 jobs:
-  autofix:
+  create-fix-issue:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
-      actions: read
+      contents: read
+      issues: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: artifacts/
-
-      - name: Collect failure context
-        id: failure_context
+      - name: Check for existing open autofix issue
+        id: check_issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "=== Workflow Run Info ===" > failure_context.txt
-          echo "Run ID: ${{ github.event.workflow_run.id }}" >> failure_context.txt
-          echo "Run URL: ${{ github.event.workflow_run.html_url }}" >> failure_context.txt
-          echo "Triggered by: ${{ github.event.workflow_run.event }}" >> failure_context.txt
-          echo "Head branch: ${{ github.event.workflow_run.head_branch }}" >> failure_context.txt
-          echo "Head SHA: ${{ github.event.workflow_run.head_sha }}" >> failure_context.txt
-          echo "" >> failure_context.txt
+          count=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --label "autofix-needed" \
+            --state open \
+            --json number \
+            --jq 'length')
+          echo "open_count=$count" >> $GITHUB_OUTPUT
 
-          echo "=== Downloaded Artifacts ===" >> failure_context.txt
-          if [ -d artifacts ]; then
-            find artifacts -type f | head -50 >> failure_context.txt
-            echo "" >> failure_context.txt
+      - name: Create autofix issue
+        if: steps.check_issue.outputs.open_count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "🔴 [AutoFix] ビルド失敗: ${{ github.event.workflow_run.head_sha }}" \
+            --label "autofix-needed" \
+            --body "## ビルド失敗の自動検出
 
-            # Include log files
-            echo "=== Log Files ===" >> failure_context.txt
-            find artifacts -name "*.log" | while read f; do
-              echo "--- $f ---" >> failure_context.txt
-              tail -200 "$f" >> failure_context.txt
-              echo "" >> failure_context.txt
-            done
+          **ワークフロー実行:** ${{ github.event.workflow_run.html_url }}
+          **ブランチ:** \`${{ github.event.workflow_run.head_branch }}\`
+          **コミット:** \`${{ github.event.workflow_run.head_sha }}\`
+          **失敗日時:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 
-            # Include summary JSON
-            echo "=== Summary JSON ===" >> failure_context.txt
-            find artifacts -name "*summary.json" | while read f; do
-              echo "--- $f ---" >> failure_context.txt
-              cat "$f" >> failure_context.txt
-              echo "" >> failure_context.txt
-            done
+          ## スケジュール済みエージェントへの指示
 
-            # Include failures JSON
-            echo "=== Failures JSON ===" >> failure_context.txt
-            find artifacts -name "*failures.json" | while read f; do
-              echo "--- $f ---" >> failure_context.txt
-              cat "$f" >> failure_context.txt
-              echo "" >> failure_context.txt
-            done
-          else
-            echo "No artifacts found." >> failure_context.txt
-          fi
+          このIssueはスケジュール済みのClaudeエージェントが自動修復するために作成されました。
 
-          echo "=== Current Source Code ===" >> failure_context.txt
-          cat build_watchlists_all_in_one.js >> failure_context.txt
+          ### 修復手順
+          1. 上記のワークフロー実行URLでエラーログを確認する
+          2. \`build_watchlists_all_in_one.js\` の該当箇所を特定する
+          3. 最小限の変更で問題を修正してコミット・プッシュする
+          4. 修復完了後このIssueをクローズする
 
-          echo "failure_context_file=failure_context.txt" >> $GITHUB_OUTPUT
-
-      - name: Run Claude autofix
-        uses: anthropics/claude-code-action@beta
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch_prefix: autofix
-          commit_message: "fix: 自動修復 - ビルド失敗の解消"
-          pull_request_title: "[AutoFix] ビルド失敗の自動修復"
-          direct_prompt: |
-            ビルドワークフロー「Build TradingView Watchlists」が失敗しました。
-            以下の失敗情報を分析し、`build_watchlists_all_in_one.js` を修正してください。
-
-            失敗情報ファイル: failure_context.txt
-
-            ## 分析と修正の手順
-
-            1. failure_context.txt を読んで失敗の根本原因を特定する
-            2. `build_watchlists_all_in_one.js` の該当箇所を特定する
-            3. 最小限の変更で問題を修正する
-            4. 修正内容と理由をPRの説明に記載する
-
-            ## 修正の方針
-
-            - APIのレート制限エラー → バッチサイズ縮小・スリープ時間延長
-            - ネットワークエラー → リトライロジックの強化
-            - データ形式の変更 → パース処理の修正
-            - 型エラー・未定義参照 → 該当コードの修正
-
-            修正が不可能または原因不明の場合は、調査結果をPRのコメントとして残してください。
+          ### よくある失敗原因
+          - Yahoo Finance APIのレート制限 → バッチサイズ縮小・スリープ延長
+          - ネットワークエラー → リトライロジックの強化
+          - JPXのデータ形式変更 → パース処理の修正
+          "
