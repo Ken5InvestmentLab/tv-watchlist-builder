@@ -1,0 +1,60 @@
+name: Auto Fix on Build Failure
+
+on:
+  workflow_run:
+    workflows: ["Build TradingView Watchlists"]
+    types: [completed]
+
+jobs:
+  create-fix-issue:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Check for existing open autofix issue
+        id: check_issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          count=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --label "autofix-needed" \
+            --state open \
+            --json number \
+            --jq 'length')
+          echo "open_count=$count" >> $GITHUB_OUTPUT
+
+      - name: Create autofix issue
+        if: steps.check_issue.outputs.open_count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --repo "${{ github.repository }}" \
+            --title "🔴 [AutoFix] ビルド失敗: ${{ github.event.workflow_run.head_sha }}" \
+            --label "autofix-needed" \
+            --body "## ビルド失敗の自動検出
+
+          **ワークフロー実行:** ${{ github.event.workflow_run.html_url }}
+          **ブランチ:** \`${{ github.event.workflow_run.head_branch }}\`
+          **コミット:** \`${{ github.event.workflow_run.head_sha }}\`
+          **失敗日時:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+          ## スケジュール済みエージェントへの指示
+
+          このIssueはスケジュール済みのClaudeエージェントが自動修復するために作成されました。
+
+          ### 修復手順
+          1. 上記のワークフロー実行URLでエラーログを確認する
+          2. \`build_watchlists_all_in_one.js\` の該当箇所を特定する
+          3. 最小限の変更で問題を修正してコミット・プッシュする
+          4. 修復完了後このIssueをクローズする
+
+          ### よくある失敗原因
+          - Yahoo Finance APIのレート制限 → バッチサイズ縮小・スリープ延長
+          - ネットワークエラー → リトライロジックの強化
+          - JPXのデータ形式変更 → パース処理の修正
+          "
