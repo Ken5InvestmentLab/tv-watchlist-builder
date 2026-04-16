@@ -1,9 +1,9 @@
 {
-  "runId": "20260415_091601",
+  "runId": "20260416_091601",
   "universeCount": 3750,
   "fetchedCount": 3749,
-  "filteredCount": 1314,
-  "outputRows": 1314,
+  "filteredCount": 1309,
+  "outputRows": 1309,
   "splitCount": 2,
   "cappedByVolume": false,
   "errorCount": 0,
