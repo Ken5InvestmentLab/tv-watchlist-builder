@@ -6,14 +6,113 @@ on:
     types: [completed]
 
 jobs:
-  create-fix-issue:
+  create-fix-pr-and-issue:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       issues: write
+      pull-requests: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure autofix-needed label exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "autofix-needed" \
+            --repo "${{ github.repository }}" \
+            --color "d73a4a" \
+            --description "Needs automatic fixing by Claude agent" \
+          || true
+
+      - name: Check for existing open autofix PR
+        id: check_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          count=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --label "autofix-needed" \
+            --state open \
+            --json number \
+            --jq 'length')
+          echo "open_count=$count" >> $GITHUB_OUTPUT
+
+      - name: Create autofix branch with diagnostic commit
+        if: steps.check_pr.outputs.open_count == '0'
+        id: create_branch
+        run: |
+          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          BRANCH_NAME="autofix/fix-${SHORT_SHA}-$(date +%s)"
+          echo "branch_name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH_NAME}"
+
+          mkdir -p .autofix
+          cat > .autofix/failure_report.md << EOF
+# ビルド失敗レポート
+
+**ワークフロー実行URL:** ${{ github.event.workflow_run.html_url }}
+**ブランチ:** \`${{ github.event.workflow_run.head_branch }}\`
+**コミット:** \`${{ github.event.workflow_run.head_sha }}\`
+**失敗日時 (UTC):** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+
+## 修復チェックリスト
+
+- [ ] エラー原因の特定
+- [ ] コード修正
+- [ ] ビルド再実行
+- [ ] 修復確認
+EOF
+
+          git add .autofix/failure_report.md
+          git commit -m "autofix: add failure report for build ${SHORT_SHA}"
+          git push origin "${BRANCH_NAME}"
+
+      - name: Create autofix PR
+        if: steps.check_pr.outputs.open_count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="${{ steps.create_branch.outputs.branch_name }}"
+          DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name')
+          FAILED_AT="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+          gh pr create \
+            --repo "${{ github.repository }}" \
+            --title "🔴 [AutoFix] ビルド失敗修正: $(echo '${{ github.event.workflow_run.head_sha }}' | cut -c1-7)" \
+            --label "autofix-needed" \
+            --base "${DEFAULT_BRANCH}" \
+            --head "${BRANCH_NAME}" \
+            --body "## ビルド失敗の自動検出
+
+**ワークフロー実行:** ${{ github.event.workflow_run.html_url }}
+**ブランチ:** \`${{ github.event.workflow_run.head_branch }}\`
+**コミット:** \`${{ github.event.workflow_run.head_sha }}\`
+**失敗日時:** ${FAILED_AT}
+**修復ブランチ:** \`${BRANCH_NAME}\`
+
+## Claudeエージェントへの指示
+
+1. 上記のワークフロー実行URLでエラーログを確認する
+2. \`build_watchlists_all_in_one.js\` の該当箇所を特定する
+3. このPRブランチで問題を修正してコミット・プッシュする
+4. PRを \`${DEFAULT_BRANCH}\` にマージする
+5. **Build TradingView Watchlists** ワークフローを再実行する
+6. ビルド成功を確認後、このPRとIssueをクローズする
+
+## よくある失敗原因
+- Yahoo Finance APIのレート制限 → バッチサイズ縮小・スリープ延長
+- ネットワークエラー → リトライロジックの強化
+- JPXのデータ形式変更 → パース処理の修正"
+
       - name: Check for existing open autofix issue
         id: check_issue
         env:
@@ -38,23 +137,12 @@ jobs:
             --label "autofix-needed" \
             --body "## ビルド失敗の自動検出
 
-          **ワークフロー実行:** ${{ github.event.workflow_run.html_url }}
-          **ブランチ:** \`${{ github.event.workflow_run.head_branch }}\`
-          **コミット:** \`${{ github.event.workflow_run.head_sha }}\`
-          **失敗日時:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+**ワークフロー実行:** ${{ github.event.workflow_run.html_url }}
+**ブランチ:** \`${{ github.event.workflow_run.head_branch }}\`
+**コミット:** \`${{ github.event.workflow_run.head_sha }}\`
+**失敗日時:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
 
-          ## スケジュール済みエージェントへの指示
+## 修復状況
 
-          このIssueはスケジュール済みのClaudeエージェントが自動修復するために作成されました。
-
-          ### 修復手順
-          1. 上記のワークフロー実行URLでエラーログを確認する
-          2. \`build_watchlists_all_in_one.js\` の該当箇所を特定する
-          3. 最小限の変更で問題を修正してコミット・プッシュする
-          4. 修復完了後このIssueをクローズする
-
-          ### よくある失敗原因
-          - Yahoo Finance APIのレート制限 → バッチサイズ縮小・スリープ延長
-          - ネットワークエラー → リトライロジックの強化
-          - JPXのデータ形式変更 → パース処理の修正
-          "
+RoutinesによってトリガーされたClaudeエージェントがPRで修復中です。
+修復完了後、このIssueは自動的にクローズされます。"
