@@ -1,0 +1,23 @@
+name: Post AutoFix Build Trigger
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  retrigger-build:
+    if: >
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'autofix-needed')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+
+    steps:
+      - name: Trigger Build TradingView Watchlists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run build_watchlists.yml \
+            --repo "${{ github.repository }}" \
+            --ref "${{ github.event.pull_request.base.ref }}"
