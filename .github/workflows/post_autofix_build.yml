@@ -12,12 +12,130 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write
+      contents: read
 
     steps:
-      - name: Trigger Build TradingView Watchlists
+      - name: Retry Build TradingView Watchlists (max 4 retries / 1h)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TARGET_REF: ${{ github.event.pull_request.base.ref }}
+          MAX_RETRIES: "4"
+          POLL_INTERVAL_SEC: "20"
+          BUILD_WORKFLOW_FILE: "build_watchlists.yml"
+          DISCORD_HELP_WEBHOOK: ${{ secrets.AUTOFIX_HELP_WEBHOOK_URL }}
         run: |
-          gh workflow run build_watchlists.yml \
-            --repo "${{ github.repository }}" \
-            --ref "${{ github.event.pull_request.base.ref }}"
+          set -euo pipefail
+
+          max_retries=${MAX_RETRIES}
+          max_attempts=$((max_retries + 1))
+          attempt=1
+          start_epoch=$(date +%s)
+          deadline_epoch=$((start_epoch + 3600))
+          success=0
+
+          while [ "$attempt" -le "$max_attempts" ]; do
+            now_epoch=$(date +%s)
+            if [ "$now_epoch" -gt "$deadline_epoch" ]; then
+              echo "1時間の制限に達したため処理を終了します。"
+              break
+            fi
+
+            echo "=== Attempt ${attempt}/${max_attempts} ==="
+            gh workflow run "${BUILD_WORKFLOW_FILE}" \
+              --repo "${REPO}" \
+              --ref "${TARGET_REF}"
+
+            sleep 8
+
+            run_id=""
+            for _ in $(seq 1 18); do
+              run_id=$(gh run list \
+                --repo "${REPO}" \
+                --workflow "${BUILD_WORKFLOW_FILE}" \
+                --branch "${TARGET_REF}" \
+                --json databaseId,status \
+                --jq '.[] | select(.status=="queued" or .status=="in_progress") | .databaseId' \
+                | head -n 1 || true)
+              if [ -n "$run_id" ]; then
+                break
+              fi
+              sleep 5
+            done
+
+            if [ -z "$run_id" ]; then
+              echo "起動したRun IDを取得できなかったため失敗扱いとします。"
+            else
+              echo "Triggered run_id=${run_id}"
+              while :; do
+                status=$(gh run view "$run_id" --repo "$REPO" --json status --jq '.status')
+                conclusion=$(gh run view "$run_id" --repo "$REPO" --json conclusion --jq '.conclusion')
+                echo "run_id=${run_id} status=${status} conclusion=${conclusion}"
+
+                if [ "$status" = "completed" ]; then
+                  if [ "$conclusion" = "success" ]; then
+                    echo "Build succeeded on attempt ${attempt}."
+                    success=1
+                  fi
+                  break
+                fi
+
+                now_epoch=$(date +%s)
+                if [ "$now_epoch" -gt "$deadline_epoch" ]; then
+                  echo "1時間制限のため監視を終了します。"
+                  break
+                fi
+
+                sleep "$POLL_INTERVAL_SEC"
+              done
+            fi
+
+            if [ "$success" -eq 1 ]; then
+              break
+            fi
+
+            if [ "$attempt" -le "$max_retries" ]; then
+              echo "Build failed. Retrying (${attempt}/${max_retries}) ..."
+            fi
+            attempt=$((attempt + 1))
+          done
+
+          if [ "$success" -eq 1 ]; then
+            echo "recovery_status=success" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "recovery_status=failed" >> "$GITHUB_OUTPUT"
+
+          help_webhook="${DISCORD_HELP_WEBHOOK:-}"
+          if [ -z "$help_webhook" ]; then
+            echo "::warning::AUTOFIX_HELP_WEBHOOK_URL is not configured. Skip Discord alert."
+            exit 1
+          fi
+
+          payload=$(cat <<JSON
+          {
+            "username": "AutoFix Monitor",
+            "embeds": [{
+              "title": "🚨 AutoFix retry limit reached",
+              "description": "Build TradingView Watchlists failed after retry limit (max 4 retries within 1 hour).",
+              "color": 16711680,
+              "fields": [
+                {"name": "Repository", "value": "${REPO}", "inline": true},
+                {"name": "PR", "value": "#${{ github.event.pull_request.number }}", "inline": true},
+                {"name": "Merged by", "value": "${{ github.event.pull_request.merged_by.login }}", "inline": true},
+                {"name": "Runbook", "value": "Please inspect Actions logs/artifacts and patch the autofix branch."}
+              ],
+              "url": "https://github.com/${REPO}/actions/workflows/${BUILD_WORKFLOW_FILE}"
+            }]
+          }
+JSON
+          )
+
+          curl --fail --silent --show-error \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d "$payload" \
+            "$help_webhook"
+
+          exit 1

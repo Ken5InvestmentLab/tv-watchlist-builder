@@ -1,0 +1,42 @@
+name: AutoFix PR Open Trigger
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled]
+
+jobs:
+  kickoff-autofix:
+    if: contains(github.event.pull_request.labels.*.name, 'autofix-needed')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Post guidance comment (PR-trigger based)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+
+          body=$(cat <<'EOF'
+🤖 AutoFix を **PRオープン起点** で開始しました。
+
+### 実行フロー
+1. PR本文 / `.autofix/failure_report.md` / 失敗したActionsログを確認
+2. エラー原因を特定してこのPRブランチへ修正をpush
+3. PRをマージ
+4. マージ後に `Post AutoFix Build Trigger` が起動し、`Build TradingView Watchlists` を再実行
+5. 失敗時は **1時間以内に最大4回リトライ**
+6. それでも失敗する場合は `AUTOFIX_HELP_WEBHOOK_URL` にDiscord通知
+
+> 補足: 時間ベースのscheduleではなく、PRイベント(`opened/reopened/synchronize/labeled`)がトリガーです。
+EOF
+)
+
+          gh pr comment "$PR_NUMBER" \
+            --repo "$REPO" \
+            --body "$body"
