@@ -1,11 +1,11 @@
-name: AutoFix PR Open Trigger
+name: AutoFix PR Status Comment
 
 on:
   pull_request:
     types: [opened, reopened, synchronize, labeled]
 
 jobs:
-  kickoff-autofix:
+  post-autofix-status:
     if: contains(github.event.pull_request.labels.*.name, 'autofix-needed')
     runs-on: ubuntu-latest
     permissions:
@@ -13,7 +13,7 @@ jobs:
       contents: read
 
     steps:
-      - name: Post guidance comment (PR-trigger based)
+      - name: Post guidance comment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -23,19 +23,19 @@ jobs:
           set -euo pipefail
 
           body=$(cat <<'EOF'
-🤖 AutoFix を **PRオープン起点** で開始しました。
+          🤖 AutoFix PR を検出しました。
 
-### 実行フロー
-1. PR本文 / `.autofix/failure_report.md` / 失敗したActionsログを確認
-2. エラー原因を特定してこのPRブランチへ修正をpush
-3. PRをマージ
-4. マージ後に `Post AutoFix Build Trigger` が起動し、`Build TradingView Watchlists` を再実行
-5. 失敗時は **1時間以内に最大4回リトライ**
-6. それでも失敗する場合は `AUTOFIX_HELP_WEBHOOK_URL` にDiscord通知
+          ### 実行フロー
+          1. `Auto Fix on Build Failure` が失敗ログを収集
+          2. Codexアプリ側の定期オートメーションがこのPRを検知
+          3. Codexが原因を調査して修正をこのPRブランチへpush
+          4. マージ後に `Post AutoFix Build Trigger` が起動し、`Build TradingView Watchlists` を再実行
+          5. 失敗時は **1時間以内に最大4回リトライ**
+          6. それでも失敗する場合は `AUTOFIX_HELP_WEBHOOK_URL` にDiscord通知
 
-> 補足: 時間ベースのscheduleではなく、PRイベント(`opened/reopened/synchronize/labeled`)がトリガーです。
-EOF
-)
+          > 補足: GitHub Actions内ではOpenAI APIキーを使いません。修復処理本体はCodexアプリのオートメーションで実行します。
+          EOF
+          )
 
           gh pr comment "$PR_NUMBER" \
             --repo "$REPO" \
