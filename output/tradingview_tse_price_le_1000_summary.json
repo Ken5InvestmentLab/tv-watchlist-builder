@@ -1,13 +1,13 @@
 {
-  "runId": "20260512_112001",
+  "runId": "20260512_120642",
   "universeCount": 3752,
   "fetchedCount": 3751,
   "priceFilteredCount": 1345,
-  "filteredCount": 698,
-  "outputRows": 698,
+  "filteredCount": 788,
+  "outputRows": 788,
   "splitCount": 2,
   "cappedByVolume": false,
-  "minVolumeThreshold": 15000,
+  "minVolumeThreshold": 10000,
   "maxSymbolsPerFile": 500,
   "maxTotalSymbols": 1000,
   "errorCount": 0,
@@ -17,7 +17,7 @@
   "yahooFetchTargetCount": 3752,
   "filters": {
     "PRICE_THRESHOLD": 1000,
-    "MIN_VOLUME_THRESHOLD": 15000
+    "MIN_VOLUME_THRESHOLD": 10000
   },
   "thresholds": {
     "MIN_SUCCESS_RATE": 0.95,
