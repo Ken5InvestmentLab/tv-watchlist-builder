@@ -18,6 +18,8 @@ Primary implementation:
 - When runtime behavior changes, run `npm install --no-save --no-package-lock xlsx yahoo-finance2` and then `node build_watchlists_all_in_one.js` when practical.
 - Generated watchlist outputs live under `output/`.
 - Runtime caches and logs should not be committed: `.cache/`, `logs/`, `node_modules/`, and `.autofix/context/`.
+- TradingView Premium watchlists are capped at 500 symbols per list. Keep generated outputs within two files of at most 500 symbols each; the updater must not trim overflow.
+- `WATCHLIST_MIN_VOLUME` controls the minimum volume filter. The default should leave practical buffer below the 1,000-symbol total cap, not merely fit by a few symbols.
 
 ## AutoFix Workflow
 

@@ -15,7 +15,8 @@ const LOG_DIR = "logs";
 
 const OUTPUT_BASENAME = "tradingview_tse_price_le_1000";
 const PRICE_THRESHOLD = 1000;
-const MAX_SYMBOLS_PER_FILE = 1000;
+const MIN_VOLUME_THRESHOLD = readNonNegativeIntegerEnv("WATCHLIST_MIN_VOLUME", 15000);
+const MAX_SYMBOLS_PER_FILE = readPositiveIntegerEnv("TRADINGVIEW_WATCHLIST_SYMBOL_LIMIT", 500);
 const MAX_WATCHLIST_FILES = 2;
 const MAX_TOTAL_SYMBOLS = MAX_SYMBOLS_PER_FILE * MAX_WATCHLIST_FILES;
 
@@ -64,6 +65,30 @@ function sleep(ms) {
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function readPositiveIntegerEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 1) {
+    throw new Error(`${name} must be a positive integer. Received: ${raw}`);
+  }
+
+  return Math.floor(value);
+}
+
+function readNonNegativeIntegerEnv(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`${name} must be a non-negative integer. Received: ${raw}`);
+  }
+
+  return Math.floor(value);
 }
 
 function sleepWithJitter(baseMs) {
@@ -516,24 +541,27 @@ async function main() {
 
   saveDailyCache(dailyCache.file, cacheData);
 
-  const filteredRows = rows.filter(
+  const priceFilteredRows = rows.filter(
     (row) => row.previous_close !== null && row.previous_close <= PRICE_THRESHOLD
+  );
+  const filteredRows = priceFilteredRows.filter(
+    (row) => Number.isFinite(row.volume) && row.volume >= MIN_VOLUME_THRESHOLD
   );
 
   let outputRows = [...filteredRows];
   let cappedByVolume = false;
 
+  outputRows.sort((a, b) => {
+    const volA = Number.isFinite(a.volume) ? a.volume : -1;
+    const volB = Number.isFinite(b.volume) ? b.volume : -1;
+    if (volB !== volA) return volB - volA;
+    if (a.previous_close !== b.previous_close) return a.previous_close - b.previous_close;
+    return a.tv_symbol.localeCompare(b.tv_symbol);
+  });
+
   if (outputRows.length > MAX_TOTAL_SYMBOLS) {
-    outputRows.sort((a, b) => {
-      const volA = Number.isFinite(a.volume) ? a.volume : -1;
-      const volB = Number.isFinite(b.volume) ? b.volume : -1;
-      if (volB !== volA) return volB - volA;
-      return a.previous_close - b.previous_close;
-    });
     outputRows = outputRows.slice(0, MAX_TOTAL_SYMBOLS);
     cappedByVolume = true;
-  } else {
-    outputRows.sort((a, b) => a.previous_close - b.previous_close);
   }
 
   const outputChunks = chunkArray(outputRows, MAX_SYMBOLS_PER_FILE).slice(0, MAX_WATCHLIST_FILES);
@@ -553,15 +581,23 @@ async function main() {
     runId,
     universeCount: tvSymbols.length,
     fetchedCount: successCount,
+    priceFilteredCount: priceFilteredRows.length,
     filteredCount: filteredRows.length,
     outputRows: outputRows.length,
     splitCount: outputChunks.length,
     cappedByVolume,
+    minVolumeThreshold: MIN_VOLUME_THRESHOLD,
+    maxSymbolsPerFile: MAX_SYMBOLS_PER_FILE,
+    maxTotalSymbols: MAX_TOTAL_SYMBOLS,
     errorCount,
     rateLimitCount,
     successRate,
     cacheHitCount: cachedRows.length,
     yahooFetchTargetCount: pending.length,
+    filters: {
+      PRICE_THRESHOLD,
+      MIN_VOLUME_THRESHOLD,
+    },
     thresholds: {
       MIN_SUCCESS_RATE,
       MAX_ERROR_COUNT,
@@ -576,13 +612,19 @@ async function main() {
   log("---");
   log(`母集団銘柄数: ${tvSymbols.length}`);
   log(`前日終値を取得できた銘柄数: ${successCount}`);
-  log(`${PRICE_THRESHOLD}円以下の抽出件数: ${filteredRows.length}`);
+  log(`${PRICE_THRESHOLD}円以下の件数: ${priceFilteredRows.length}`);
+  log(`出来高${MIN_VOLUME_THRESHOLD}株以上の抽出件数: ${filteredRows.length}`);
   log(`最終出力件数: ${outputRows.length}`);
   log(`分割数: ${outputChunks.length}`);
   log(`出来高上位2000件制限: ${cappedByVolume ? "ON" : "OFF"}`);
   log(`失敗件数: ${errorCount}`);
   log(`429件数: ${rateLimitCount}`);
   log(`成功率: ${(successRate * 100).toFixed(2)}%`);
+  log(`Price <= ${PRICE_THRESHOLD} count: ${priceFilteredRows.length}`);
+  log(`Volume >= ${MIN_VOLUME_THRESHOLD} count: ${filteredRows.length}`);
+  log(`Max symbols per file: ${MAX_SYMBOLS_PER_FILE}`);
+  log(`Max total symbols: ${MAX_TOTAL_SYMBOLS}`);
+  log(`Total symbol cap by volume: ${cappedByVolume ? "ON" : "OFF"}`);
   log(`CSV: ${OUTPUT_DIR}/${OUTPUT_BASENAME}.csv`);
   log(`SUMMARY JSON: ${summaryJsonPath}`);
   log(`FAILURES JSON: ${failuresJsonPath}`);
