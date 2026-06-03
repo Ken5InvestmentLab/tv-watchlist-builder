@@ -1,9 +1,9 @@
 {
-  "runId": "20260602_091608",
-  "universeCount": 3752,
-  "fetchedCount": 3744,
-  "priceFilteredCount": 1355,
-  "filteredCount": 1004,
+  "runId": "20260603_091603",
+  "universeCount": 3739,
+  "fetchedCount": 3739,
+  "priceFilteredCount": 1372,
+  "filteredCount": 1011,
   "outputRows": 1000,
   "splitCount": 2,
   "cappedByVolume": true,
@@ -12,9 +12,9 @@
   "maxTotalSymbols": 1000,
   "errorCount": 0,
   "rateLimitCount": 0,
-  "successRate": 0.997867803837953,
+  "successRate": 1,
   "cacheHitCount": 0,
-  "yahooFetchTargetCount": 3752,
+  "yahooFetchTargetCount": 3739,
   "filters": {
     "PRICE_THRESHOLD": 1000,
     "MIN_VOLUME_THRESHOLD": 10000
