@@ -1,1 +1,252 @@
-[]
+[
+  {
+    "yahoo_symbol": "6952.T",
+    "tv_symbol": "TSE:6952",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6954.T",
+    "tv_symbol": "TSE:6954",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6955.T",
+    "tv_symbol": "TSE:6955",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6958.T",
+    "tv_symbol": "TSE:6958",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6960.T",
+    "tv_symbol": "TSE:6960",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6961.T",
+    "tv_symbol": "TSE:6961",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6962.T",
+    "tv_symbol": "TSE:6962",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6963.T",
+    "tv_symbol": "TSE:6963",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6964.T",
+    "tv_symbol": "TSE:6964",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6965.T",
+    "tv_symbol": "TSE:6965",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6966.T",
+    "tv_symbol": "TSE:6966",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6969.T",
+    "tv_symbol": "TSE:6969",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6971.T",
+    "tv_symbol": "TSE:6971",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6976.T",
+    "tv_symbol": "TSE:6976",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6977.T",
+    "tv_symbol": "TSE:6977",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6981.T",
+    "tv_symbol": "TSE:6981",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6982.T",
+    "tv_symbol": "TSE:6982",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6986.T",
+    "tv_symbol": "TSE:6986",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6988.T",
+    "tv_symbol": "TSE:6988",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6989.T",
+    "tv_symbol": "TSE:6989",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6993.T",
+    "tv_symbol": "TSE:6993",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6994.T",
+    "tv_symbol": "TSE:6994",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6995.T",
+    "tv_symbol": "TSE:6995",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6996.T",
+    "tv_symbol": "TSE:6996",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6997.T",
+    "tv_symbol": "TSE:6997",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6998.T",
+    "tv_symbol": "TSE:6998",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "6999.T",
+    "tv_symbol": "TSE:6999",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7003.T",
+    "tv_symbol": "TSE:7003",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7004.T",
+    "tv_symbol": "TSE:7004",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7011.T",
+    "tv_symbol": "TSE:7011",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7012.T",
+    "tv_symbol": "TSE:7012",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7013.T",
+    "tv_symbol": "TSE:7013",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7014.T",
+    "tv_symbol": "TSE:7014",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7018.T",
+    "tv_symbol": "TSE:7018",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7021.T",
+    "tv_symbol": "TSE:7021",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7022.T",
+    "tv_symbol": "TSE:7022",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7030.T",
+    "tv_symbol": "TSE:7030",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7031.T",
+    "tv_symbol": "TSE:7031",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7033.T",
+    "tv_symbol": "TSE:7033",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7034.T",
+    "tv_symbol": "TSE:7034",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7035.T",
+    "tv_symbol": "TSE:7035",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7036.T",
+    "tv_symbol": "TSE:7036",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7037.T",
+    "tv_symbol": "TSE:7037",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7038.T",
+    "tv_symbol": "TSE:7038",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7039.T",
+    "tv_symbol": "TSE:7039",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7040.T",
+    "tv_symbol": "TSE:7040",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7041.T",
+    "tv_symbol": "TSE:7041",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7042.T",
+    "tv_symbol": "TSE:7042",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7043.T",
+    "tv_symbol": "TSE:7043",
+    "reason": "Server caught an exception"
+  },
+  {
+    "yahoo_symbol": "7044.T",
+    "tv_symbol": "TSE:7044",
+    "reason": "Server caught an exception"
+  }
+]
