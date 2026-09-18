@@ -1,10 +1,10 @@
 {
-  "runId": "20260917_091223",
+  "runId": "20260918_091226",
   "universeCount": 3712,
   "fetchedCount": 3711,
   "priceFilteredCount": 1288,
-  "filteredCount": 840,
-  "outputRows": 840,
+  "filteredCount": 843,
+  "outputRows": 843,
   "splitCount": 2,
   "cappedByVolume": false,
   "minVolumeThreshold": 10000,
